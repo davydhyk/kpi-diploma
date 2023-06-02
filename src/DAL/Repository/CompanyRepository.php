@@ -27,8 +27,8 @@ class CompanyRepository {
 
   public function insert($company) {
     $query = $this->db->prepare("
-      INSERT INTO companies (id_mmk, id_ba, name, city, country, telephone, telephone2, mobile, vatCode, email, web, bankAccountNumber, termsAndConditions, checkoutNode)
-      VALUES (:id_mmk, :id_ba, :name, :city, :country, :telephone, :telephone2, :mobile, :vatCode, :email, :web, :bankAccountNumber, :termsAndConditions, :checkoutNode)
+      INSERT INTO companies (id_mmk, id_ba, name, city, country, telephone, telephone2, mobile, vatCode, email, web, bankAccountNumber, termsAndConditions, checkoutNote)
+      VALUES (:id_mmk, :id_ba, :name, :city, :country, :telephone, :telephone2, :mobile, :vatCode, :email, :web, :bankAccountNumber, :termsAndConditions, :checkoutNote)
     ");
     $this->bindCompanyToParams($query, $company);
     return $query->execute();
@@ -51,7 +51,7 @@ class CompanyRepository {
           web = :web,
           bankAccountNumber = :bankAccountNumber,
           termsAndConditions = :termsAndConditions,
-          checkoutNode = :checkoutNode
+          checkoutNote = :checkoutNote
       WHERE id = :id
     ");
     $query->bindParam('id', $company['id'], \PDO::PARAM_INT);
@@ -67,7 +67,7 @@ class CompanyRepository {
   private function bindCompanyToParams(&$query, $company) {
     $params = [
       'id_mmk', 'id_ba', 'name', 'city', 'country', 'telephone', 'telephone2', 'mobile', 'vatCode',
-      'email', 'web', 'bankAccountNumber', 'termsAndConditions', 'checkoutNode'
+      'email', 'web', 'bankAccountNumber', 'termsAndConditions', 'checkoutNote'
     ];
     foreach ($params as $param) {
       $query->bindParam($param, $company[$param], !empty($company[$param]) ? \PDO::PARAM_STR : \PDO::PARAM_NULL);

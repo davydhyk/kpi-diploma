@@ -46,10 +46,10 @@ class BoatIntegration {
     $equipmentIdMap = $this->equipmentRepository->getMap('id_mmk', 'id');
     $basesIdMap = $this->baseRepository->getMap('id_mmk', 'id');
     $boatsIdMap = $this->boatRepository->getMap('id_mmk', 'id');
-    $boatsHashIdMap = $this->boatRepository->getMap('id_mmk', 'hash_mmk');
-    $companies = $this->companyRepository->getAllIds();
-    foreach ($companies as $companyId) {
-      $boats = $this->mmk->getBoats($companyId);
+    $i = 0;
+    foreach ($companiesIdMap as $mmkCompanyId => $companyId) {
+      if (!$mmkCompanyId) continue;
+      $boats = $this->mmk->getBoats($mmkCompanyId);
       if (empty($boats)) continue;
       foreach ($boats as $boat) {
         $hash = md5(json_encode($boat));
@@ -57,6 +57,7 @@ class BoatIntegration {
         $boat['id_mmk'] = $id;
         $boat['hash_mmk'] = $hash;
         $boat['shipyardId'] = $shipyardsIdMap[$boat['shipyardId']] ?? null;
+        $boat['companyId'] = $companyId;
         $boat['homeBaseId'] = $basesIdMap[$boat['homeBaseId']] ?? null;
         if (!empty($boat['equipmentIds'])) {
           $equipment = [];
@@ -68,11 +69,11 @@ class BoatIntegration {
         }
         unset($boat['id']);
         $existBoat = !isset($boatsIdMap[$id])
-          ? $this->boatRepository->getByNameAndCompany($boat['name'], $companiesIdMap[$companyId])
+          ? $this->boatRepository->getByNameAndCompany($boat['name'], $companyId)
           : $this->boatRepository->getById($boatsIdMap[$id]);
         if ($existBoat === false) {
           $this->boatRepository->insert($boat);
-        } else if (isset($boatsHashIdMap[$id]) && $boatsHashIdMap[$id] !== $hash) {
+        } else if ($existBoat['hash_mmk'] !== $hash) {
           $existBoat = $this->mergeExistBoatWithNew($existBoat, $boat);
           $this->boatRepository->update($existBoat);
         }
@@ -82,18 +83,15 @@ class BoatIntegration {
 
   private function processBA() {
     $companiesIdMap = $this->companyRepository->getMap('id_ba', 'id');
-    $shipyardsNameMap = $this->shipyardRepository->getMap('name', 'id');
-    $equipmentIdMap = $this->equipmentRepository->getMap('name_ba', 'id');
-    $basesIdMap = $this->baseRepository->getMap('id_ba', 'id');
     $boatsIdMap = $this->boatRepository->getMap('id_ba', 'id');
-    $boatsHashIdMap = $this->boatRepository->getMap('id_ba', 'hash_ba');
     $countryIdMap = $this->countryRepository->getMap('shortName', 'id');
     $page = 1;
-    $limit = 1;
+    $limit = 50;
     $boats = $this->ba->getBoats($page, $limit);
+    $i = 0;
     while (!empty($boats)) {
       foreach ($boats as $boat) {
-        $hash = json_encode($boat);
+        $hash = md5(json_encode($boat));
         $id = $boat['_id'];
         $base = $this->baseRepository->getByName($boat['marina']);
         if ($base === false) {
@@ -101,26 +99,31 @@ class BoatIntegration {
           $base = $this->retrieveBase($boat, $countryId);
         }
         $companyId = $companiesIdMap[$boat['charter_id']];
+        $shipyardId = $this->shipyardRepository->getByName($boat['manufacturer']);
         $boat = $this->prepareNewBaBoat($boat);
         $boat['companyId'] = $companyId;
+        $boat['shipyardId'] = $shipyardId;
+        $boat['homeBaseId'] = $base['id'];
+        $boat['hash_ba'] = $hash;
         $existBoat = !isset($boatsIdMap[$id])
-          ? $this->boatRepository->getByNameAndCompany($boat['name'], $companiesIdMap[$companyId])
+          ? $this->boatRepository->getByNameAndCompany($boat['name'], $companyId)
           : $this->boatRepository->getById($boatsIdMap[$id]);
         if ($existBoat === false) {
           $this->boatRepository->insert($boat);
-        } else if (isset($boatsHashIdMap[$id]) && $boatsHashIdMap[$id] !== $hash) {
+        } else if ($existBoat['hash_ba'] !== $hash) {
           $existBoat = $this->mergeExistBoatWithNew($existBoat, $boat);
           $this->boatRepository->update($existBoat);
         }
-        dbg($base);
-        dbg($boat);
       }
-      break;
       $boats = $this->ba->getBoats(++$page, $limit);
     }
   }
 
   private function mergeExistBoatWithNew($existBoat, $newBoat) {
+    foreach ($existBoat as $key => $value) {
+      if (empty($newBoat[$key]) || !is_scalar($newBoat[$key])) continue;
+      $existBoat[$key] = $newBoat[$key];
+    }
     return $existBoat;
   }
 
@@ -128,9 +131,9 @@ class BoatIntegration {
     $boat = [];
     $boat['id_ba'] = $newBoat['_id'];
     $boat['slug'] = $newBoat['slug'];
-    $boat['name'] = preg_replace('/^.*| /', '', $newBoat['title']);
+    $boat['name'] = preg_replace('/^.*\| /', '', $newBoat['title']);
     $boat['model'] = $newBoat['manufacturer'] . ' ' . $newBoat['model'];
-    $boat['kind'] = $this->boatKindMap[$newBoat['category']];
+    $boat['kind'] = $this->boatKindMap[$newBoat['category_slug']] ?? $newBoat['category'];
     $boat['mainsailType'] = $newBoat['sail'];
     $boat['rating'] = $newBoat['reviewsScore'];
     $boat['images'] = [[
@@ -153,17 +156,17 @@ class BoatIntegration {
     $boat['year'] = $params['year'];
     $boat['engine'] = ($params['number_engines'] > 1 ? $params['number_engines'] . ' x ' : '') . $params['engine_power'] . 'HP';
     $boat['fuelCapacity'] = $params['fuel'];
-    $boat['waterCapacity'] = $params['water_tank'];
+    $boat['waterCapacity'] = $params['water_tank'] ?? null;
     return $boat;
   }
 
-  private $boatKindMap = [
-    'Sailing Yacht' => 'Sail boat',
-    'Motor Boat' => 'Motor boat',
-    'Catamaran' => 'Catamaran',
-    'Gulet' => 'Gulet',
-    'Motor Yacht' => 'Motoryacht',
-    'Power catamaran' => 'Power catamaran'
+  private array $boatKindMap = [
+    'sailing-yacht' => 'Sail boat',
+    'motor-boat' => 'Motor boat',
+    'catamaran' => 'Catamaran',
+    'gulet' => 'Gulet',
+    'motor-yacht' => 'Motoryacht',
+    'power-catamaran' => 'Power catamaran'
   ] ;
 
   private function retrieveBase($boat, $countryId) {
@@ -214,6 +217,6 @@ class BoatIntegration {
 
   public function process() {
     $this->processMMK();
-//    $this->processBA();
+    $this->processBA();
   }
 }

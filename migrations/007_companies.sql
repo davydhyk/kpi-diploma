@@ -13,7 +13,7 @@ CREATE TABLE companies (
   web VARCHAR(255),
   bankAccountNumber VARCHAR(255),
   termsAndConditions LONGTEXT,
-  checkoutNode TEXT,
+  checkoutNote TEXT,
   CONSTRAINT pk_companies
     PRIMARY KEY (id)
 );

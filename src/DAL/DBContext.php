@@ -30,4 +30,8 @@ class DBContext implements IDBContext {
   public function lastInsertId() {
     return $this->pdo->lastInsertId();
   }
+
+  public function errorInfo() {
+    return $this->pdo->errorInfo();
+  }
 }

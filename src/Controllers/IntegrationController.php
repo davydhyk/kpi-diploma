@@ -19,14 +19,14 @@ class IntegrationController {
 //    }
 
     $integrations = [
-//      \BLL\Integration\WorldRegionIntegration::class,
-//      \BLL\Integration\CountryIntegration::class,
-//      \BLL\Integration\SailingAreaIntegration::class,
-//      \BLL\Integration\BaseIntegration::class,
-//      \BLL\Integration\ShipyardIntegration::class,
-//      \BLL\Integration\EquipmentIntegration::class,
-//      \BLL\Integration\CompanyIntegration::class,
-      \BLL\Integration\BoatIntegration::class
+      \BLL\Integration\WorldRegionIntegration::class,
+      \BLL\Integration\CountryIntegration::class,
+      \BLL\Integration\SailingAreaIntegration::class,
+      \BLL\Integration\BaseIntegration::class,
+      \BLL\Integration\ShipyardIntegration::class,
+      \BLL\Integration\EquipmentIntegration::class,
+      \BLL\Integration\CompanyIntegration::class,
+//      \BLL\Integration\BoatIntegration::class
     ];
 
     global $container;

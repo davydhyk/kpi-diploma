@@ -57,7 +57,8 @@ class Router {
   }
 
   private function sendData($data) {
-//    echo json_encode($data);
-    dbg($data);
+    header('Content-Type: application/json');
+    echo json_encode($data);
+//    dbg($data);
   }
 }

@@ -20,6 +20,38 @@ class BoatRepository{
     return $query->fetch(\PDO::FETCH_ASSOC);
   }
 
+  public function getByFilter($filter) {
+    $params = [];
+    $where = '';
+    $joins = [];
+    if (isset($filter['shipyardId'])) {
+      $where .= ' AND b.shipyardId = :shipyardId';
+      $params[] = ['shipyardId', $filter['shipyardId'], \PDO::PARAM_INT];
+    }
+    if (isset($filter['baseId'])) {
+      $where .= ' AND b.homeBaseId = :homeBaseId';
+      $params[] = ['homeBaseId', $filter['baseId'], \PDO::PARAM_INT];
+    }
+    if (isset($filter['countryId'])) {
+      $where .= ' AND bs.countryId = :countryId';
+      $joins[] = ' LEFT JOIN bases bs ON bs.id = b.homeBaseId';
+      $params[] = ['countryId', $filter['countryId'], \PDO::PARAM_INT];
+    }
+    $joins = implode(' ', $joins);
+    $query = $this->db->prepare("
+      SELECT b.* FROM boats b
+      {$joins} WHERE 1=1 {$where} 
+      LIMIT :limit OFFSET :offset
+    ");
+    foreach ($params as $values) {
+      $query->bindParam(...$values);
+    }
+    $query->bindParam('limit', $filter['limit'], \PDO::PARAM_INT);
+    $query->bindParam('offset', $filter['offset'], \PDO::PARAM_INT);
+    $query->execute();
+    return $query->fetchAll(\PDO::FETCH_ASSOC);
+  }
+
   public function getByNameAndCompany($name, $companyId) {
     $query = $this->db->prepare("
       SELECT * FROM boats
@@ -35,19 +67,16 @@ class BoatRepository{
   }
 
   public function insert($boat): bool {
-    $boat['hash'] = md5(json_encode($boat));
     $query = $this->db->prepare("
       INSERT INTO boats (
-        id_ba, id_mmk, name, model, shipyardId, year, kind, homeBaseId, companyId, draught, beam, length,
-        waterCapacity, fuelCapacity, engine, deposit, currency, commissionPercentage, wc, berths, cabins,
-        transitLog, mainsailArea, genoaArea, mainsailType, genoaType, requiredSkipperLicense, defaultCheckInDay,
-        defaultCheckInTime, defaultCheckOutTime, hash_mmk, hash_ba
+        id_ba, id_mmk, name, slug, model, shipyardId, year, kind, homeBaseId, companyId, draught, beam, length,
+        waterCapacity, fuelCapacity, engine, price, startPrice, discountPercentage, deposit, currency,
+        wc, berths, cabins, mainsailArea, genoaArea, mainsailType, genoaType, hash_mmk, hash_ba
       )
       VALUES (
-        :id_ba, :id_mmk, :name, :model, :shipyardId, :year, :kind, :homeBaseId, :companyId, :draught, :beam,
-        :length, :waterCapacity, :fuelCapacity, :engine, :deposit, :currency, :commissionPercentage, :wc,
-        :berths, :cabins, :transitLog, :mainsailArea, :genoaArea, :mainsailType, :genoaType,
-        :requiredSkipperLicense, :defaultCheckInDay, :defaultCheckInTime, :defaultCheckOutTime, :hash_mmk, :hash_ba
+        :id_ba, :id_mmk, :name, :slug, :model, :shipyardId, :year, :kind, :homeBaseId, :companyId, :draught, :beam,
+        :length, :waterCapacity, :fuelCapacity, :engine, :price, :startPrice, :discountPercentage, :deposit,
+        :currency, :wc, :berths, :cabins, :mainsailArea, :genoaArea, :mainsailType, :genoaType, :hash_mmk, :hash_ba
       )
     ");
     $this->bindBoatToParams($query, $boat);
@@ -59,9 +88,6 @@ class BoatRepository{
     if (!empty($boat['equipment'])) {
       $result = $result && $this->insertEquipmentToBoats($boat['id'], $boat['equipmentIds']);
     }
-    if (!empty($boat['products'])) {
-      $result = $result && $this->insertProductsToBoats($boat['id'], $boat['products']);
-    }
     return $result;
   }
 
@@ -71,6 +97,7 @@ class BoatRepository{
       SET id_mmk = :id_mmk,
           id_ba = :id_ba,
           name = :name,
+          slug = :slug,
           model = :model,
           shipyardId = :shipyardId,
           year = :year,
@@ -83,21 +110,18 @@ class BoatRepository{
           waterCapacity = :waterCapacity,
           fuelCapacity = :fuelCapacity,
           engine = :engine,
+          price = :price,
+          startPrice = :startPrice,
+          discountPercentage = :discountPercentage,
           deposit = :deposit,
           currency = :currency,
-          commissionPercentage = :commissionPercentage,
           wc = :wc,
           berths = :berths,
           cabins = :cabins,
-          transitLog = :transitLog,
           mainsailArea = :mainsailArea,
           genoaArea = :genoaArea,
           mainsailType = :mainsailType,
           genoaType = :genoaType,
-          requiredSkipperLicense = :requiredSkipperLicense,
-          defaultCheckInDay = :defaultCheckInDay,
-          defaultCheckInTime = :defaultCheckInTime,
-          defaultCheckOutTime = :defaultCheckOutTime,
           hash_mmk = :hash_mmk,
           hash_ba = :hash_ba
       WHERE id = :id
@@ -106,22 +130,20 @@ class BoatRepository{
     $this->bindBoatToParams($query, $boat);
     $result = $query->execute();
 
-    $deleteImages = $this->db->prepare("DELETE FROM images WHERE boatId = ?");
-    $deleteImages->execute([ $boat['id'] ]);
-    if (!empty($boat['images'])) {
-      $result = $result && $this->insertImagesToBoats($boat['id'], $boat['images']);
+    if (isset($boat['images'])) {
+      $deleteImages = $this->db->prepare("DELETE FROM images WHERE boatId = ?");
+      $deleteImages->execute([$boat['id']]);
+      if (!empty($boat['images'])) {
+        $result = $result && $this->insertImagesToBoats($boat['id'], $boat['images']);
+      }
     }
 
-    $deleteEquipment = $this->db->prepare("DELETE FROM boats_to_equipment WHERE boatId = ?");
-    $deleteEquipment->execute([ $boat['id'] ]);
-    if (!empty($boat['equipmentIds'])) {
-      $result = $result && $this->insertEquipmentToBoats($boat['id'], $boat['equipmentIds']);
-    }
-
-    $productsEquipment = $this->db->prepare("DELETE FROM products WHERE boatId = ?");
-    $productsEquipment->execute([ $boat['id'] ]);
-    if (!empty($boat['products'])) {
-      $result = $result && $this->insertProductsToBoats($boat['id'], $boat['products']);
+    if (isset($boat['equipmentIds'])) {
+      $deleteEquipment = $this->db->prepare("DELETE FROM boats_to_equipment WHERE boatId = ?");
+      $deleteEquipment->execute([$boat['id']]);
+      if (!empty($boat['equipmentIds'])) {
+        $result = $result && $this->insertEquipmentToBoats($boat['id'], $boat['equipmentIds']);
+      }
     }
     return $result;
   }
@@ -133,10 +155,10 @@ class BoatRepository{
 
   private function bindBoatToParams(&$query, $boat) {
     $params = [
-      'id_ba', 'id_mmk', 'name', 'model', 'year', 'kind', 'homeBaseId', 'shipyardId', 'companyId', 'draught', 'beam',
-      'length', 'waterCapacity', 'fuelCapacity', 'engine', 'deposit', 'currency', 'commissionPercentage', 'wc',
-      'berths', 'cabins', 'transitLog', 'mainsailArea', 'genoaArea', 'mainsailType', 'genoaType',
-      'requiredSkipperLicense', 'defaultCheckInDay', 'defaultCheckInTime', 'defaultCheckOutTime', 'hash_mmk', 'hash_ba'
+      'id_mmk', 'id_ba', 'name', 'slug', 'model', 'shipyardId', 'year', 'kind', 'homeBaseId', 'companyId', 'draught',
+      'beam', 'length', 'waterCapacity', 'fuelCapacity', 'engine', 'price', 'startPrice', 'discountPercentage',
+      'deposit', 'currency', 'wc', 'berths', 'cabins', 'mainsailArea', 'genoaArea', 'mainsailType', 'genoaType',
+      'hash_mmk', 'hash_ba'
     ];
     foreach ($params as $param) {
       $query->bindParam($param, $boat[$param], !empty($boat[$param]) ? \PDO::PARAM_STR : \PDO::PARAM_NULL);

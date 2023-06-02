@@ -2,8 +2,8 @@ CREATE TABLE boats (
     id BIGINT AUTO_INCREMENT,
     id_mmk BIGINT,
     id_ba VARCHAR(255),
-    slug VARCHAR(255),
     name VARCHAR(255),
+    slug VARCHAR(255),
     model VARCHAR(255),
     shipyardId BIGINT,
     year INT,
@@ -16,21 +16,18 @@ CREATE TABLE boats (
     waterCapacity FLOAT,
     fuelCapacity FLOAT,
     engine VARCHAR(255),
+    price DOUBLE,
+    startPrice DOUBLE,
+    discountPercentage DOUBLE,
     deposit FLOAT,
     currency VARCHAR(3),
-    commissionPercentage FLOAT,
     wc INT,
     berths INT,
     cabins INT,
-    transitLog FLOAT,
     mainsailArea FLOAT,
     genoaArea FLOAT,
     mainsailType VARCHAR(255),
     genoaType VARCHAR(255),
-    requiredSkipperLicense bool,
-    defaultCheckInDay INT,
-    defaultCheckInTime VARCHAR(255),
-    defaultCheckOutTime VARCHAR(255),
     hash_mmk VARCHAR(255),
     hash_ba VARCHAR(255),
     CONSTRAINT pk_boats
@@ -52,23 +49,6 @@ CREATE TABLE images (
     CONSTRAINT pk_images
         PRIMARY KEY (id),
     CONSTRAINT fk_images_boats
-        FOREIGN KEY (boatId) REFERENCES boats (id)
-        ON DELETE CASCADE
-);
-
-CREATE TABLE products (
-    id BIGINT AUTO_INCREMENT NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    extras JSON,
-    dateFrom DATE,
-    dateTo DATE,
-    price DOUBLE,
-    startPrice DOUBLE,
-    discountPercentage FLOAT,
-    boatId BIGINT NOT NULL,
-    CONSTRAINT pk_products
-        PRIMARY KEY (id),
-    CONSTRAINT fk_products_boats
         FOREIGN KEY (boatId) REFERENCES boats (id)
         ON DELETE CASCADE
 );
