@@ -27,8 +27,8 @@ class CompanyRepository {
 
   public function insert($company) {
     $query = $this->db->prepare("
-      INSERT INTO companies (id_mmk, id_ba, name, city, country, telephone, telephone2, mobile, vatCode, email, web, bankAccountNumber, termsAndConditions, checkoutNote)
-      VALUES (:id_mmk, :id_ba, :name, :city, :country, :telephone, :telephone2, :mobile, :vatCode, :email, :web, :bankAccountNumber, :termsAndConditions, :checkoutNote)
+      INSERT INTO companies (id_mmk, id_ba, name, city, country, telephone, email, web)
+      VALUES (:id_mmk, :id_ba, :name, :city, :country, :telephone, :email, :web)
     ");
     $this->bindCompanyToParams($query, $company);
     return $query->execute();
@@ -44,14 +44,8 @@ class CompanyRepository {
           city = :city,
           country = :country,
           telephone = :telephone,
-          telephone2 = :telephone2,
-          mobile = :mobile,
-          vatCode = :vatCode,
           email = :email,
-          web = :web,
-          bankAccountNumber = :bankAccountNumber,
-          termsAndConditions = :termsAndConditions,
-          checkoutNote = :checkoutNote
+          web = :web
       WHERE id = :id
     ");
     $query->bindParam('id', $company['id'], \PDO::PARAM_INT);
@@ -66,8 +60,7 @@ class CompanyRepository {
 
   private function bindCompanyToParams(&$query, $company) {
     $params = [
-      'id_mmk', 'id_ba', 'name', 'city', 'country', 'telephone', 'telephone2', 'mobile', 'vatCode',
-      'email', 'web', 'bankAccountNumber', 'termsAndConditions', 'checkoutNote'
+      'id_mmk', 'id_ba', 'name', 'city', 'country', 'telephone', 'email', 'web'
     ];
     foreach ($params as $param) {
       $query->bindParam($param, $company[$param], !empty($company[$param]) ? \PDO::PARAM_STR : \PDO::PARAM_NULL);

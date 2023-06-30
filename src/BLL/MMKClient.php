@@ -67,7 +67,33 @@ class MMKClient extends APIClient {
     return $this->query('/yachts?companyId=' . $companyId);
   }
 
-  public function getBoat(int $id) {
-    return $this->query('/yacht/' . $id);
+  public function getBoat(int $boatId) {
+    return $this->query('/yacht/' . $boatId);
+  }
+
+  public function getBoatAvailability(int $boatId, $years) {
+    $availability = '';
+    foreach ($years as $year) {
+      $av = $this->query('/shortAvailability/' . $year . '?yachtId=' . $boatId);
+      if (empty($av[0]['bs'])) {
+        $availability .= str_repeat('0', cal_days_in_year($year));
+      } else {
+        $availability .= $av[0]['bs'];
+      }
+    }
+    return $availability;
+  }
+
+  public function getBoatPrice(int $boatId, $checkIn, $checkOut) {
+    $query = [
+      'dateFrom' => $checkIn->format('Y-m-d\T00:00:00'),
+      'dateTo' => $checkOut->format('Y-m-d\T00:00:00'),
+      'yachtId' => $boatId
+    ];
+    $prices = $this->query('/prices?' . http_build_query($query));
+    foreach ($prices as &$price) {
+      unset($price['yachtId'], $price['dateFrom'], $price['dateTo']);
+    }
+    return $prices;
   }
 }

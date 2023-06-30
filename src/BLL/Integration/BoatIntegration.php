@@ -46,11 +46,14 @@ class BoatIntegration {
     $equipmentIdMap = $this->equipmentRepository->getMap('id_mmk', 'id');
     $basesIdMap = $this->baseRepository->getMap('id_mmk', 'id');
     $boatsIdMap = $this->boatRepository->getMap('id_mmk', 'id');
-    $i = 0;
     foreach ($companiesIdMap as $mmkCompanyId => $companyId) {
-      if (!$mmkCompanyId) continue;
+      if (!$mmkCompanyId) {
+        continue;
+      }
       $boats = $this->mmk->getBoats($mmkCompanyId);
-      if (empty($boats)) continue;
+      if (empty($boats)) {
+        continue;
+      }
       foreach ($boats as $boat) {
         $hash = md5(json_encode($boat));
         $id = $boat['id'];
@@ -62,7 +65,9 @@ class BoatIntegration {
         if (!empty($boat['equipmentIds'])) {
           $equipment = [];
           foreach ($boat['equipmentIds'] as $eq) {
-            if (!isset($equipmentIdMap[$eq])) continue;
+            if (!isset($equipmentIdMap[$eq])) {
+              continue;
+            }
             $equipment[] = $equipmentIdMap[$eq];
           }
           $boat['equipmentIds'] = $equipment;
@@ -99,10 +104,10 @@ class BoatIntegration {
           $base = $this->retrieveBase($boat, $countryId);
         }
         $companyId = $companiesIdMap[$boat['charter_id']];
-        $shipyardId = $this->shipyardRepository->getByName($boat['manufacturer']);
+        $shipyard = $this->shipyardRepository->getByName($boat['manufacturer']);
         $boat = $this->prepareNewBaBoat($boat);
         $boat['companyId'] = $companyId;
-        $boat['shipyardId'] = $shipyardId;
+        $boat['shipyardId'] = $shipyard['id'];
         $boat['homeBaseId'] = $base['id'];
         $boat['hash_ba'] = $hash;
         $existBoat = !isset($boatsIdMap[$id])
@@ -154,7 +159,11 @@ class BoatIntegration {
     $boat['beam'] = $params['beam'];
     $boat['draught'] = $params['draft'];
     $boat['year'] = $params['year'];
-    $boat['engine'] = ($params['number_engines'] > 1 ? $params['number_engines'] . ' x ' : '') . $params['engine_power'] . 'HP';
+    $boat['engine'] = (
+      $params['number_engines'] > 1
+        ? $params['number_engines'] . ' x '
+        : ''
+      ) . $params['engine_power'] . 'HP';
     $boat['fuelCapacity'] = $params['fuel'];
     $boat['waterCapacity'] = $params['water_tank'] ?? null;
     return $boat;

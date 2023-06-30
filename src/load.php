@@ -1,15 +1,17 @@
 <?php
 
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
-error_reporting(E_ALL);
-
 function dbg(...$values) {
   foreach ($values as $value) {
     echo '<pre>';
     echo htmlentities(print_r($value, true));
     echo '</pre>';
   }
+}
+
+function cal_days_in_year($year) {
+  return ($year % 4 === 0 && $year % 100 !== 0) || $year % 400 === 0
+    ? 366
+    : 365;
 }
 
 spl_autoload_register(function ($class_name) {

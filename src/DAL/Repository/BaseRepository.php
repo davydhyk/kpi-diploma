@@ -161,7 +161,6 @@ class BaseRepository {
         'baseId' => $baseId,
         'sailingAreaId' => $sailingAreaId
       ]);
-      if (!$result) dbg($baseId, $sailingAreas);
     }
     return $result;
   }

@@ -31,6 +31,22 @@ class DBContext implements IDBContext {
     return $this->pdo->lastInsertId();
   }
 
+  public function quote(string $query) {
+    return $this->pdo->quote($query);
+  }
+
+  public function quoteMaybeArray($values) {
+    $quotedValues = [];
+    if (is_array($values)) {
+      foreach ($values as $v) {
+        $quotedValues[] = $this->quote($v);
+      }
+    } else {
+      $quotedValues[] = $this->quote($values);
+    }
+    return $quotedValues;
+  }
+
   public function errorInfo() {
     return $this->pdo->errorInfo();
   }

@@ -38,6 +38,58 @@ class BAClient extends APIClient {
     return $res['data'][0]['data'];
   }
 
+  public function getBoatAvailability(string $slug, $years) {
+    $res = $this->query('/availability/' . $slug);
+    $availability = '';
+    foreach ($years as $year) {
+      $availability .= str_repeat('0', cal_days_in_year($year));
+    }
+    if (isset($res['data'][0]['bad_content']) && $res['data'][0]['bad_content']) {
+      $availability = '';
+      foreach ($years as $year) {
+        $availability .= str_repeat('1', cal_days_in_year($year));
+      }
+      return $availability;
+    }
+    if (empty($res['data'][0]['availabilities'])) {
+      return $availability;
+    }
+    $avs = $res['data'][0]['availabilities'];
+    foreach ($avs as $av) {
+      $checkIn = \DateTime::createFromFormat('Y-m-d', $av['chin']);
+      $checkOut = \DateTime::createFromFormat('Y-m-d', $av['chout']);
+      $dayFrom = intval($checkIn->format('z'));
+      $daysDiff = $checkOut->diff($checkIn)->days;
+      $regExp = sprintf('/^([01]{%d})([01]{%d})(.*)/', $dayFrom, $daysDiff);
+      $replacement = '${1}' . str_repeat('1', $daysDiff) . '${3}';
+      $availability = preg_replace($regExp, $replacement, $availability);
+    }
+    return $availability;
+  }
+
+  public function getBoatPrice(string $slug, $checkIn, $checkOut) {
+    $query = [
+      'checkIn' => $checkIn->format('Y-m-d'),
+      'checkOut' => $checkOut->format('Y-m-d')
+    ];
+    $reqUrl = sprintf('/price/%s?%s', $slug, http_build_query($query));
+    $res = $this->query($reqUrl);
+    $prices = [];
+    if (empty($res['data'][0]['data'][0])) {
+      return $prices;
+    }
+    $pricesSource = $res['data'][0]['data'];
+    foreach ($pricesSource as $p) {
+      $prices[] = [
+        'price' => $p['totalPrice'],
+        'startPrice' => $p['price'],
+        'discountPercentage' => $p['discount'],
+        'currency' => $p['currency']
+      ];
+    }
+    return $prices;
+  }
+
   public function getEquipment() {
     return [
       /** Cockpit - Boat interior */

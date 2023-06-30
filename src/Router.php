@@ -47,18 +47,19 @@ class Router {
     $status = !empty($result['status']) ? $result['status'] : 200;
     http_response_code($status);
     $this->sendHeaders();
-    if (!empty($result['data'])) {
+    if (isset($result['data'])) {
       $this->sendData($result['data']);
     }
   }
 
   private function sendHeaders() {
-
+    header('Content-Type: application/json');
+    header('Access-Control-Allow-Origin: http://localhost:5173');
+    header('Access-Control-Allow-Credentials: true');
+    header('Access-Control-Max-Age: 300');
   }
 
   private function sendData($data) {
-    header('Content-Type: application/json');
     echo json_encode($data);
-//    dbg($data);
   }
 }

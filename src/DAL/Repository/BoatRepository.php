@@ -13,34 +13,122 @@ class BoatRepository{
 
   public function getById($id) {
     $query = $this->db->prepare("
-      SELECT * FROM boats
-      WHERE id = ?
+      SELECT b.*,
+             c.name as country,
+             COALESCE(b2.name, b2.name_ba) as base,
+             (SELECT i.url FROM images i WHERE i.description = 'Main image' AND i.boatId = b.id LIMIT 1) as image,
+             s.name as shipyard,
+             c2.name as company,
+             c2.telephone as companyMobile,
+             c2.web as companyWeb
+      FROM boats b
+      INNER JOIN bases b2 on b.homeBaseId = b2.id
+      INNER JOIN countries c on b2.countryId = c.id
+      LEFT JOIN shipyards s on b.shipyardId = s.id
+      LEFT JOIN companies c2 on b.companyId = c2.id
+      WHERE b.id = ?
     ");
     $query->execute([ $id ]);
     return $query->fetch(\PDO::FETCH_ASSOC);
   }
 
+  public function getImagesByBoatId($id) {
+    $query = $this->db->prepare("
+      SELECT *
+      FROM images
+      WHERE boatId = ?
+    ");
+    $query->execute([ $id ]);
+    return $query->fetchAll(\PDO::FETCH_ASSOC);
+  }
+
   public function getByFilter($filter) {
+    $arrayKeys = [
+      'shipyardId', 'kind', 'companyId', 'mainsailType', 'genoaType'
+    ];
+    $geoKeys = [
+      'baseId', 'countryId', 'sailingAreaId', 'regionId'
+    ];
+    $rangeKeys = [
+      'yearFrom', 'yearTo', 'wcFrom', 'wcTo', 'berthsFrom', 'berthsTo', 'cabinsFrom', 'cabinsTo',
+      'draughtFrom', 'draughtTo', 'beamFrom', 'beamTo', 'lengthFrom', 'lengthTo', 'waterCapacityFrom',
+      'waterCapacityTo', 'fuelCapacityFrom', 'fuelCapacityTo', 'priceFrom', 'priceTo'
+    ];
     $params = [];
     $where = '';
-    $joins = [];
-    if (isset($filter['shipyardId'])) {
-      $where .= ' AND b.shipyardId = :shipyardId';
-      $params[] = ['shipyardId', $filter['shipyardId'], \PDO::PARAM_INT];
+    foreach ($rangeKeys as $fKey) {
+      if (!isset($filter[$fKey])) {
+        continue;
+      }
+      $compareKey = strpos($fKey, 'From') !== false ? '>=' : '<=';
+      $key = str_replace(['From', 'To'], '', $fKey);
+      $where .= " AND b.$key $compareKey :$fKey";
+      $params[] = [$fKey, $filter[$fKey]];
     }
-    if (isset($filter['baseId'])) {
-      $where .= ' AND b.homeBaseId = :homeBaseId';
-      $params[] = ['homeBaseId', $filter['baseId'], \PDO::PARAM_INT];
+    foreach ($arrayKeys as $fKey) {
+      if (!isset($filter[$fKey])) {
+        continue;
+      }
+      $values = $this->db->quoteMaybeArray($filter[$fKey]);
+      $values = implode(', ', $values);
+      $where .= " AND b.$fKey IN ($values)";
     }
-    if (isset($filter['countryId'])) {
-      $where .= ' AND bs.countryId = :countryId';
-      $joins[] = ' LEFT JOIN bases bs ON bs.id = b.homeBaseId';
-      $params[] = ['countryId', $filter['countryId'], \PDO::PARAM_INT];
+    $whereGeoOr = [];
+    foreach ($geoKeys as $gKey) {
+      if (!isset($filter[$gKey])) {
+        continue;
+      }
+      $values = $this->db->quoteMaybeArray($filter[$gKey]);
+      $values = implode(', ', $values);
+      if ($gKey === 'regionId') {
+        $subQuery = "
+          SELECT b.id FROM boats b
+          INNER JOIN bases bs ON bs.id = b.homeBaseId
+          INNER JOIN countries c ON c.id = bs.countryId
+          INNER JOIN world_regions wr on wr.id = c.regionId
+          WHERE wr.id IN ($values)
+        ";
+        $whereGeoOr[] = "b.id IN ($subQuery)";
+      } elseif ($gKey === 'sailingAreaId') {
+        $subQuery = "
+          SELECT b.id FROM boats b
+          INNER JOIN bases bs ON bs.id = b.homeBaseId
+          INNER JOIN bases_to_sailing_areas btsa on bs.id_mmk = btsa.baseId
+          INNER JOIN sailing_areas sa on btsa.sailingAreaId = sa.id
+          WHERE sa.id IN ($values)
+        ";
+        $whereGeoOr[] = "b.id IN ($subQuery)";
+      } elseif ($gKey === 'countryId') {
+        $subQuery = "
+          SELECT b.id FROM boats b
+          INNER JOIN bases bs ON bs.id = b.homeBaseId
+          INNER JOIN countries c ON c.id = bs.countryId
+          WHERE c.id IN ($values)
+        ";
+        $whereGeoOr[] = "b.id IN ($subQuery)";
+      } elseif ($gKey === 'baseId') {
+        $subQuery = "
+          SELECT b.id FROM boats b
+          INNER JOIN bases bs ON bs.id = b.homeBaseId
+          WHERE bs.id IN ($values)
+        ";
+        $whereGeoOr[] = "b.id IN ($subQuery)";
+      }
     }
-    $joins = implode(' ', $joins);
+    if (!empty($whereGeoOr)) {
+      $whereGeoOr = implode(' OR ', $whereGeoOr);
+      $where .= " AND $whereGeoOr";
+    }
     $query = $this->db->prepare("
-      SELECT b.* FROM boats b
-      {$joins} WHERE 1=1 {$where} 
+      SELECT b.*,
+             c.name as country,
+             COALESCE(b2.name, b2.name_ba) as base,
+             (SELECT i.url FROM images i WHERE i.description = 'Main image' AND i.boatId = b.id LIMIT 1) as image
+      FROM boats b
+      INNER JOIN bases b2 on b.homeBaseId = b2.id
+      INNER JOIN countries c on b2.countryId = c.id
+      WHERE 1 {$where}
+      ORDER BY IF(b.price IS NULL, 0, 1) DESC
       LIMIT :limit OFFSET :offset
     ");
     foreach ($params as $values) {

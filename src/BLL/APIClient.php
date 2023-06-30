@@ -6,7 +6,6 @@ use DAL\Interfaces\IConfig;
 
 abstract class APIClient {
 
-  protected IConfig $config;
   protected string $baseUrl;
   protected array $headers = [];
 

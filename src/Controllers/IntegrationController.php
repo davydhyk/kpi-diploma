@@ -26,7 +26,7 @@ class IntegrationController {
       \BLL\Integration\ShipyardIntegration::class,
       \BLL\Integration\EquipmentIntegration::class,
       \BLL\Integration\CompanyIntegration::class,
-//      \BLL\Integration\BoatIntegration::class
+      \BLL\Integration\BoatIntegration::class
     ];
 
     global $container;
